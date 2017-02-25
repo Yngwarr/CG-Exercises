@@ -8,6 +8,8 @@
 
 #define WIN_TITLE  "Первая лаба"
 
+/* TODO add own color to every primitive */
+
 struct point_t
 {
 	GLint x, y;
@@ -29,6 +31,7 @@ struct color_t
 	}
 };
 
+/* globals. don't like globals. */
 GLint width = 800, height = 600;
 color_t color(0, 0, 0);
 
@@ -41,7 +44,7 @@ void display()
 	//glPointSize(6);
 	glLineWidth(3);
 
-	if (vs.empty() || vs.back().empty()) goto q_display;
+	//if (vs.empty() || vs.back().empty()) goto q_display;
 		
 	glColor3ub(color.r, color.g, color.b);
 	for (auto ps : vs) {
@@ -57,12 +60,17 @@ void display()
 		glVertex2i(vs.back()[i].x, vs.back()[i].y);
 	glEnd();
 
-q_display:
+	glRasterPos2i(0,0);
+	glutBitmapCharacter(GLUT_BITMAP_HELVETICA_10, 'X');
+
+quit:
 	glFinish();
 }
 
+/* TODO reshape is dead */
 void reshape(GLint w, GLint h)
 {
+	//std::cerr << "reshape." << w << '.' << h << '.';
 	width = w;
 	height = h;
 	glViewport(0, 0, w, h);
@@ -97,22 +105,27 @@ void mouse(int button, int state, int x, int y)
 	/* клавиша была нажата, но не отпущена */
 	if (state != GLUT_DOWN) return;
 	/* новая точка по левому клику */
-	if (button == GLUT_LEFT_BUTTON)
-	{
+	if (button == GLUT_LEFT_BUTTON) {
 		point_t p(x, height - y);
+		if (vs.empty()) {
+			std::vector<point_t> ps;
+			vs.push_back(ps);
+		}
 		vs.back().push_back(p);
 	}
 	/* удаление последней точки по правому клику */
 	if (button == GLUT_RIGHT_BUTTON) {
-		if (!vs.empty() && vs.back().empty()) {
+		if (vs.empty()) goto quit;
+		if (vs.back().empty()) {
 			vs.pop_back();
-			return;
+			goto quit;
 		}
 		vs.back().pop_back();
 	}
 	if (button == GLUT_MIDDLE_BUTTON) {
 		vs.push_back(std::vector<point_t>(0));
 	}
+quit:
 	glutPostRedisplay();
 }
 
@@ -124,9 +137,9 @@ int main(int argc, char **argv)
 	glutCreateWindow(WIN_TITLE);
 	glEnable(GL_POINT_SMOOTH);
 
+	glutReshapeFunc(reshape);
 	glutDisplayFunc(display);
 	glutKeyboardFunc(keyboard);
-	glutReshapeFunc(reshape);
 	glutMouseFunc(mouse);
 
 	glutMainLoop();
