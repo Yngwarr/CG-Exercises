@@ -54,12 +54,41 @@ class Shape(object):
         self.color = Color('#000000')
 
 
+def printText(text, pos, color):
+    glColor3ub(color.r, color.g, color.b)
+    offset = Point(0, 0)
+    for c in text:
+        if c != '\n':
+            offset.x += 9
+        else:
+            offset.y -= 15
+            offset.x = 0
+            continue
+        glRasterPos2i(pos.x + offset.x, pos.y + offset.y)
+        glutBitmapCharacter(GLUT_BITMAP_9_BY_15, ord(c))
+
+
+def doCmd(text):
+    global help_shown
+    if text == 'help':
+        help_shown = True if not help_shown else False
+
 # globals
 WIN_TITLE = 'Первая лаба'
 width = 800
 height = 600
 ss = []
 
+cmd = ['']
+cmd_edition_mode = False
+help_text = '''Use keys to manupulate objects:
+    left mouse button - add point to current shape
+    right mouse button - remove last point from current shape
+    middle mouse button - finish with current shape
+    w, a, s, d - move current shape
+    r, g, b, R, G, B - change color of current shape
+    <, > - shift chapes in the list'''
+help_shown = False
 
 # TODO reshape still doesn't work
 def reshape(w, h):
@@ -70,7 +99,7 @@ def reshape(w, h):
     glViewport(0, 0, w, h)
     glMatrixMode(GL_PROJECTION)
     glLoadIdentity()
-    gluOrtho2D(0, w, 0, h)
+    glOrtho(0, w, 0, h, -1.0, 1.0)
     glMatrixMode(GL_MODELVIEW)
     glLoadIdentity()
 
@@ -80,7 +109,7 @@ def display():
 
     glClearColor(0.3, 0.3, 0.3, 1)
     glClear(GL_COLOR_BUFFER_BIT)
-    # glPointSize(6)
+    glPointSize(6)
     glLineWidth(3)
 
     for s in ss:
@@ -99,33 +128,62 @@ def display():
             glVertex2i(ss[-1].vtx[i].x, ss[-1].vtx[i].y)
         glEnd()
 
-    glRasterPos2i(0,0)
-    glutBitmapCharacter(GLUT_BITMAP_HELVETICA_10, ord('X'))
+        if len(ss[-1].vtx) != 0:
+            glBegin(GL_POINTS)
+            glVertex2i(ss[-1].vtx[-1].x, ss[-1].vtx[-1].y)
+            glEnd()
+
+    text_color = Color('#ffffff')
+    if not help_shown:
+        printText('Type \':help\' for help.', Point(5, 20), text_color)
+    else:
+        printText(help_text, Point(5, 125), text_color)
+    printText(cmd[-1], Point(5, 5), text_color)
 
     glFinish()
 
 
 def keyboard(key, x, y):
-    # Изменение RGB-компонент цвета точек
-    if key == 'r': ss[-1].color.r += 5
-    if key == 'g': ss[-1].color.g += 5
-    if key == 'b': ss[-1].color.b += 5
-    if key == 'R': ss[-1].color.r -= 5
-    if key == 'G': ss[-1].color.g -= 5
-    if key == 'B': ss[-1].color.b -= 5
-    # Изменение XY-кординат точек
-    if key == 'w':
-        for i in range(0, len(ss[-1].vtx)):
-            ss[-1].vtx[i].y += 9
-    if key == 's':
-        for i in range(0, len(ss[-1].vtx)):
-            ss[-1].vtx[i].y -= 9
-    if key == 'a':
-        for i in range(0, len(ss[-1].vtx)):
-            ss[-1].vtx[i].x -= 9
-    if key == 'd':
-        for i in range(0, len(ss[-1].vtx)):
-            ss[-1].vtx[i].x += 9
+    global ss, cmd, cmd_edition_mode
+    if cmd_edition_mode:
+        if key == '\x0d':
+            cmd_edition_mode = False
+            cmd += ['']
+            doCmd(cmd[-2][1:])
+        elif key == '\x08':
+            cmd[-1] = cmd[-1][:-1]
+        else:
+            cmd[-1] += key
+            print(str(ord(key)))
+    else:
+        if key == ':':
+            cmd_edition_mode = True
+            cmd += ':'
+        # Изменение RGB-компонент цвета точек
+        if key == 'r': ss[-1].color.r += 5
+        if key == 'g': ss[-1].color.g += 5
+        if key == 'b': ss[-1].color.b += 5
+        if key == 'R': ss[-1].color.r -= 5
+        if key == 'G': ss[-1].color.g -= 5
+        if key == 'B': ss[-1].color.b -= 5
+        # Изменение XY-кординат точек
+        if key == 'w':
+            for i in range(0, len(ss[-1].vtx)):
+                ss[-1].vtx[i].y += 9
+        if key == 's':
+            for i in range(0, len(ss[-1].vtx)):
+                ss[-1].vtx[i].y -= 9
+        if key == 'a':
+            for i in range(0, len(ss[-1].vtx)):
+                ss[-1].vtx[i].x -= 9
+        if key == 'd':
+            for i in range(0, len(ss[-1].vtx)):
+                ss[-1].vtx[i].x += 9
+        if key == '>':
+            ss = [ss[-1]] + ss[:-1]
+        if key == '<':
+            ss = ss[1:] + [ss[0]]
+
     glutPostRedisplay()
 
 def mouse(button, state, x, y):
