@@ -2,6 +2,7 @@
 # -*- coding: utf-8 -*-
 
 import sys
+import shlex
 from peak.rules import *
 from OpenGL.GL import *
 from OpenGL.GLU import *
@@ -17,6 +18,8 @@ class Point(object):
     def __repr__(self):
         return '(' + str(self.x) + ',' + str(self.y) + ')'
 
+    def get2i(self):
+        return (self.x, self.y)
 
 class Color(object):
     @abstract()
@@ -43,19 +46,61 @@ class Color(object):
         return '#{:0>2x}{:0>2x}{:0>2x}'.format(self.r, self.g, self.b)
 
     def inverse(self):
-        self.r ^= 0xFF
-        self.g ^= 0xFF
-        self.b ^= 0xFF
+        return Color(self.r ^ 0xFF, self.g ^ 0xFF, self.b ^ 0xFF)
 
+    def get3i(self):
+        return (self.r, self.g, self.b)
+
+    def get4f(self):
+        return (self.r/255., self.g/255., self.b/255., 1.)
 
 class Shape(object):
     def __init__(self):
         self.vtx = []
         self.color = Color('#000000')
 
+class Settings(object):
+    def __init__(self):
+        self._vs = {
+            'title': ['Первая лаба', 'title of the window'],
+            'bg': [Color('#333333'), 'background color'],
+            'text_color': [Color('#ffffff'), 'color of text'],
+            'motd': ['Type \':help\' for help.', 'the first message you see'],
+            'point_size': [6, 'size of the point denoting the current vertex'],
+            'line_width': [3, 'width of the line around current shape'],
+            'color_delta': [5, 'value to add to color with r,g,b'],
+            'pos_delta': [9, 'value to add to pos with w,a,s,d']
+        }
+
+    def __getitem__(self, key):
+       return self._vs[key][0] 
+
+    def __repr__(self):
+        return ', '.join(self._vs.keys())
+
+    # TODO set title doesn't work in runtime
+    @abstract()
+    def __setitem__(self, key, value):
+        pass
+
+    @when(__setitem__, 'isinstance(self._vs[key][0], Color)')
+    def _set_color(self, key, value):
+        self._vs[key][0] = Color(value)
+
+    @when(__setitem__, 'isinstance(self._vs[key][0], int)')
+    def _set_int(self, key, value):
+        self._vs[key][0] = int(value)
+
+    @when(__setitem__, 'isinstance(self._vs[key][0], basestring)')
+    def _set_color(self, key, value):
+        self._vs[key][0] = value
+
+    def showInfo(self, key):
+        return key + ' - ' + self._vs[key][1]
+
 
 def printText(text, pos, color):
-    glColor3ub(color.r, color.g, color.b)
+    glColor3ub(*color.get3i())
     offset = Point(0, 0)
     for c in text:
         if c != '\n':
@@ -69,30 +114,78 @@ def printText(text, pos, color):
 
 
 def doCmd(text):
-    global help_shown
-    if text == 'help':
-        help_shown = True if not help_shown else False
+    global cfg
+    global txts
+    global text_buf
+    
+    print('Doin\' ' + text)
+    # args-like split 
+    c = shlex.split(text)
+    if c[0] == 'help':
+        text_buf = txts['help']
+    elif c[0] == 'clear':
+        text_buf = ''
+    elif c[0] == 'get':
+        if len(c) < 2:
+            text_buf = txts['get_usage']
+            return
+        try:
+            text_buf = c[1] + ' = ' + str(cfg[c[1]])
+        except KeyError:
+            text_buf = txts['no_setting'].format(c[1])
+    elif c[0] == 'set':
+        if len(c) < 2:
+            text_buf = txts['set_usage']
+        else:
+            if c[1] == 'info':
+                if len(c) == 2:
+                    # TODO make it fit the screen size
+                    text_buf = txts['set_info'].format(str(cfg))
+                try:
+                    text_buf = cfg.showInfo(c[2])
+                except KeyError:
+                    text_buf = txts['no_setting'].format(c[2])
+            else:
+                # TODO check if c[2] exists
+                if len(c) != 3:
+                    text_buf = txts['set_usage']
+                try:
+                    cfg[c[1]] = c[2]
+                except KeyError:
+                    text_buf = txts['no_setting'].format(c[1])
+
 
 # globals
-WIN_TITLE = 'Первая лаба'
-width = 800
-height = 600
-ss = []
+cfg = None
+cfg_file = None
+width = None
+height = None
+ss = None
+text_buf = None
 
 cmd = ['']
 cmd_edition_mode = False
-help_text = '''Use keys to manupulate objects:
+txts = {
+    'help': '''Use keys to manupulate objects:
     left mouse button - add point to current shape
     right mouse button - remove last point from current shape
     middle mouse button - finish with current shape
     w, a, s, d - move current shape
     r, g, b, R, G, B - change color of current shape
-    <, > - shift chapes in the list'''
-help_shown = False
+    <, > - shift chapes in the list''',
+    'get_usage': '''Usage: get setting_name
+See all settings with \'set info\' ''',
+    'set_usage': '''Usage: set setting_name value
+See all settings with \'set info\' ''',
+    'set_info': '{}\nYou can see info about each setting using\
+ \'set info setting_name\'',
+    'no_setting': 'No setting with name \'{}\''
+}
 
 # TODO reshape still doesn't work
 def reshape(w, h):
-    global width, height
+    global width
+    global height
 
     width = w
     height = h
@@ -105,53 +198,58 @@ def reshape(w, h):
 
 
 def display():
-    global color, ss
+    global cfg
+    global text_buf
 
-    glClearColor(0.3, 0.3, 0.3, 1)
+    glClearColor(*cfg['bg'].get4f())
     glClear(GL_COLOR_BUFFER_BIT)
-    glPointSize(6)
-    glLineWidth(3)
+    glPointSize(cfg['point_size'])
+    glLineWidth(cfg['line_width'])
 
     for s in ss:
-        glColor3ub(s.color.r, s.color.g, s.color.b)
+        glColor3ub(*s.color.get3i())
         glBegin(GL_POLYGON)
         for i in range(0, len(s.vtx)):
-            glVertex2i(s.vtx[i].x, s.vtx[i].y)
+            glVertex2i(*s.vtx[i].get2i())
         glEnd()
 
     if len(ss) != 0:
-        glColor3ub(ss[-1].color.r ^ 0xFF, \
-                ss[-1].color.g ^ 0xFF, \
-                ss[-1].color.b ^ 0xFF)
+        glColor3ub(*ss[-1].color.inverse().get3i())
         glBegin(GL_LINE_LOOP)
         for i in range(0, len(ss[-1].vtx)):
-            glVertex2i(ss[-1].vtx[i].x, ss[-1].vtx[i].y)
+            glVertex2i(*ss[-1].vtx[i].get2i())
         glEnd()
 
         if len(ss[-1].vtx) != 0:
             glBegin(GL_POINTS)
-            glVertex2i(ss[-1].vtx[-1].x, ss[-1].vtx[-1].y)
+            glVertex2i(*ss[-1].vtx[-1].get2i())
             glEnd()
 
-    text_color = Color('#ffffff')
-    if not help_shown:
-        printText('Type \':help\' for help.', Point(5, 20), text_color)
-    else:
-        printText(help_text, Point(5, 125), text_color)
-    printText(cmd[-1], Point(5, 5), text_color)
+    printText(text_buf, Point(5, 20 + 15*text_buf.count('\n')), \
+            cfg['text_color'])
+    printText(cmd[-1], Point(5, 5), cfg['text_color'])
 
     glFinish()
 
 
 def keyboard(key, x, y):
-    global ss, cmd, cmd_edition_mode
+    global cfg
+    global ss
+    global cmd
+    global cmd_edition_mode
+
     if cmd_edition_mode:
         if key == '\x0d':
             cmd_edition_mode = False
             cmd += ['']
             doCmd(cmd[-2][1:])
         elif key == '\x08':
+            if cmd[-1] == ':':
+                cmd_edition_mode = False
             cmd[-1] = cmd[-1][:-1]
+        elif key == '\x1b':
+            cmd_edition_mode = False
+            cmd[-1] = ''
         else:
             cmd[-1] += key
             print(str(ord(key)))
@@ -159,35 +257,53 @@ def keyboard(key, x, y):
         if key == ':':
             cmd_edition_mode = True
             cmd += ':'
-        # Изменение RGB-компонент цвета точек
-        if key == 'r': ss[-1].color.r += 5
-        if key == 'g': ss[-1].color.g += 5
-        if key == 'b': ss[-1].color.b += 5
-        if key == 'R': ss[-1].color.r -= 5
-        if key == 'G': ss[-1].color.g -= 5
-        if key == 'B': ss[-1].color.b -= 5
-        # Изменение XY-кординат точек
-        if key == 'w':
+        # RGB accending
+        elif key == 'r': ss[-1].color.r += cfg['color_delta']
+        elif key == 'g': ss[-1].color.g += cfg['color_delta']
+        elif key == 'b': ss[-1].color.b += cfg['color_delta']
+        # RGB decenging
+        elif key == 'R': ss[-1].color.r -= cfg['color_delta']
+        elif key == 'G': ss[-1].color.g -= cfg['color_delta']
+        elif key == 'B': ss[-1].color.b -= cfg['color_delta']
+        # Changing position of whole the shape
+        elif key == 'W':
             for i in range(0, len(ss[-1].vtx)):
-                ss[-1].vtx[i].y += 9
-        if key == 's':
+                ss[-1].vtx[i].y += cfg['pos_delta']
+        elif key == 'S':
             for i in range(0, len(ss[-1].vtx)):
-                ss[-1].vtx[i].y -= 9
-        if key == 'a':
+                ss[-1].vtx[i].y -= cfg['pos_delta']
+        elif key == 'A':
             for i in range(0, len(ss[-1].vtx)):
-                ss[-1].vtx[i].x -= 9
-        if key == 'd':
+                ss[-1].vtx[i].x -= cfg['pos_delta']
+        elif key == 'D':
             for i in range(0, len(ss[-1].vtx)):
-                ss[-1].vtx[i].x += 9
-        if key == '>':
+                ss[-1].vtx[i].x += cfg['pos_delta']
+        # Changing position of the point
+        elif key == 'w':
+            ss[-1].vtx[-1].y += cfg['pos_delta']
+        elif key == 's':
+            ss[-1].vtx[-1].y -= cfg['pos_delta']
+        elif key == 'a':
+            ss[-1].vtx[-1].x -= cfg['pos_delta']
+        elif key == 'd':
+            ss[-1].vtx[-1].x += cfg['pos_delta']
+        # reorder the list of shapes
+        elif key == '>':
             ss = [ss[-1]] + ss[:-1]
-        if key == '<':
+        elif key == '<':
             ss = ss[1:] + [ss[0]]
+        # reorder the list of points
+        elif key == '.':
+            ss[-1].vtx = [ss[-1].vtx[-1]] + ss[-1].vtx[:-1]
+        elif key == ',':
+            ss[-1].vtx = ss[-1].vtx[1:] + [ss[-1].vtx[0]]
 
     glutPostRedisplay()
 
 def mouse(button, state, x, y):
+    global cfg
     global ss
+
     # клавиша была нажата, но не отпущена
     if state != GLUT_DOWN: return
     # новая точка по левому клику 
@@ -210,10 +326,24 @@ def mouse(button, state, x, y):
 
 
 if __name__ == '__main__':
+    cfg = Settings()
+    cfg_file = '.lab1rc'
+    
+    # load config file
+    with open(cfg_file) as f:
+        cmds = [x.strip() for x in f.readlines()]
+    map(doCmd, cmds)
+
+    width = 800
+    height = 600
+    ss = []
+    text_buf = cfg['motd']
+
     glutInit(sys.argv)
     glutInitDisplayMode(GLUT_RGB)
     glutInitWindowSize(width, height)
-    glutCreateWindow(WIN_TITLE)
+
+    glutCreateWindow(cfg['title'])
     glEnable(GL_POINT_SMOOTH)
 
     glutReshapeFunc(reshape)
