@@ -9,6 +9,7 @@ from OpenGL.GLU import *
 from OpenGL.GLUT import *
 
 class Point(object):
+    """ Point on the screen. """
     def __init__(self, x, y):
         if not (isinstance(x, int) and isinstance(y, int)):
             raise TypeError('x and y must be int')
@@ -57,7 +58,7 @@ class Color(object):
 class Shape(object):
     def __init__(self):
         self.vtx = []
-        self.color = Color('#000000')
+        self.color = cfg['shape_color']
 
 class Settings(object):
     def __init__(self):
@@ -65,9 +66,10 @@ class Settings(object):
             'title': ['Первая лаба', 'title of the window'],
             'bg': [Color('#333333'), 'background color'],
             'text_color': [Color('#ffffff'), 'color of text'],
+            'shape_color': [Color('#000000'), 'default color for shape'],
             'motd': ['Type \':help\' for help.', 'the first message you see'],
             'point_size': [6, 'size of the point denoting the current vertex'],
-            'line_width': [3, 'width of the line around current shape'],
+            'line_width': [3, 'width of the outline of current shape'],
             'color_delta': [5, 'value to add to color with r,g,b'],
             'pos_delta': [9, 'value to add to pos with w,a,s,d']
         }
@@ -78,7 +80,6 @@ class Settings(object):
     def __repr__(self):
         return ', '.join(self._vs.keys())
 
-    # TODO set title doesn't work in runtime
     @abstract()
     def __setitem__(self, key, value):
         pass
@@ -118,7 +119,7 @@ def doCmd(text):
     global txts
     global text_buf
     
-    print('Doin\' ' + text)
+    # print('Doin\' ' + text)
     # args-like split 
     c = shlex.split(text)
     if c[0] == 'help':
@@ -139,16 +140,16 @@ def doCmd(text):
         else:
             if c[1] == 'info':
                 if len(c) == 2:
-                    # TODO make it fit the screen size
                     text_buf = txts['set_info'].format(str(cfg))
+                    return
                 try:
                     text_buf = cfg.showInfo(c[2])
                 except KeyError:
                     text_buf = txts['no_setting'].format(c[2])
             else:
-                # TODO check if c[2] exists
                 if len(c) != 3:
                     text_buf = txts['set_usage']
+                    return
                 try:
                     cfg[c[1]] = c[2]
                 except KeyError:
@@ -167,12 +168,14 @@ cmd = ['']
 cmd_edition_mode = False
 txts = {
     'help': '''Use keys to manupulate objects:
-    left mouse button - add point to current shape
-    right mouse button - remove last point from current shape
-    middle mouse button - finish with current shape
-    w, a, s, d - move current shape
+    left mouse button - add a point to current shape
+    right mouse button - remove the last point from current shape
+    middle mouse button - finish current shape
+    w, a, s, d - move current point
+    W, A, S, D - move current shape
     r, g, b, R, G, B - change color of current shape
-    <, > - shift chapes in the list''',
+    ',', '.' - shift points in the shape
+    <, > - shift shapes in the list''',
     'get_usage': '''Usage: get setting_name
 See all settings with \'set info\' ''',
     'set_usage': '''Usage: set setting_name value
@@ -182,7 +185,6 @@ See all settings with \'set info\' ''',
     'no_setting': 'No setting with name \'{}\''
 }
 
-# TODO reshape still doesn't work
 def reshape(w, h):
     global width
     global height
@@ -252,7 +254,7 @@ def keyboard(key, x, y):
             cmd[-1] = ''
         else:
             cmd[-1] += key
-            print(str(ord(key)))
+            # print(str(ord(key)))
     else:
         if key == ':':
             cmd_edition_mode = True
@@ -300,6 +302,7 @@ def keyboard(key, x, y):
 
     glutPostRedisplay()
 
+
 def mouse(button, state, x, y):
     global cfg
     global ss
@@ -330,9 +333,14 @@ if __name__ == '__main__':
     cfg_file = '.lab1rc'
     
     # load config file
-    with open(cfg_file) as f:
-        cmds = [x.strip() for x in f.readlines()]
-    map(doCmd, cmds)
+    try:
+        f = open(cfg_file)
+    except IOError:
+        print("[INFO] can't find './.lab1rc', using defaults.")
+    else:
+        with f:
+            cmds = [x.strip() for x in f.readlines()]
+        map(doCmd, cmds)
 
     width = 800
     height = 600

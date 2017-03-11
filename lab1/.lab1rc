@@ -1,0 +1,6 @@
+set title "Lab #1"
+set bg #ffffff
+set text_color #000000
+set shape_color #333333
+set motd 'Greetnigs, stranger!'
+set point_size 8
