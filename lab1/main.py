@@ -3,6 +3,7 @@
 
 import sys
 import shlex
+from copy import deepcopy
 from peak.rules import *
 from OpenGL.GL import *
 from OpenGL.GLU import *
@@ -58,12 +59,12 @@ class Color(object):
 class Shape(object):
     def __init__(self):
         self.vtx = []
-        self.color = cfg['shape_color']
+        self.color = deepcopy(cfg['shape_color'])
 
 class Settings(object):
     def __init__(self):
         self._vs = {
-            'title': ['Первая лаба', 'title of the window'],
+            'title': ['Lab 1', 'title of the window'],
             'bg': [Color('#333333'), 'background color'],
             'text_color': [Color('#ffffff'), 'color of text'],
             'shape_color': [Color('#000000'), 'default color for shape'],
@@ -307,15 +308,12 @@ def mouse(button, state, x, y):
     global cfg
     global ss
 
-    # клавиша была нажата, но не отпущена
     if state != GLUT_DOWN: return
-    # новая точка по левому клику 
     if button == GLUT_LEFT_BUTTON:
         p = Point(x, height - y)
         if len(ss) == 0: 
             ss.append(Shape())
         ss[-1].vtx.append(p)
-    # удаление последней точки по правому клику 
     if button == GLUT_RIGHT_BUTTON:
         if len(ss) == 0: return
         if len(ss[-1].vtx) == 0:
