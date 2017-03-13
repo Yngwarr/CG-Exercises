@@ -81,6 +81,15 @@
 
 Для исполнения набора команд при каждом запуске системы используется файл `./.lab1rc`. Команды в файл записываются по одной на строку без символа `:`. Например:
 
+```
+set title "Lab #1"
+set bg #ffffff
+set text_color #000000
+set shape_color #333333
+set motd 'Greetnigs, stranger!'
+set point_size 8
+```
+
 Результат загрузки программы с данным `.lab1rc` изображён на скриншоте:
 
 <img src="https://raw.githubusercontent.com/Yngwarr/CG-Exercises/master/lab1/screen/rcd.png" alt="Интерфейс программы (изменённый .lab1rc)" style="width:90.0%" />
