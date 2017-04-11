@@ -63,6 +63,19 @@ class Shape(object):
         self.vtx = []
         self.color = deepcopy(cfg['shape_color'])
 
+class Polygon(Shape):
+    def __init__(self, sides, center, rad):
+        self.r = rad
+        self.center = center
+        self.sides = sides
+        self.vtx = [Point(int(math.cos(2*math.pi/sides * i) * rad + center.x), \
+                int(math.sin(2*math.pi/sides * i) * rad + center.y)) \
+                for i in range(sides)]
+        self.color = deepcopy(cfg['shape_color'])
+        self.translation = (0, 0, 0)
+        self.rotation = (0.5, 0, 1, 0)
+        self.scale = (1, 1, 0)
+
 class Settings(object):
     def __init__(self):
         self._vs = {
@@ -101,6 +114,13 @@ class Settings(object):
 
     def showInfo(self, key):
         return key + ' - ' + self._vs[key][1]
+
+
+def distance(p1, p2):
+    """ Distance between two points. """
+    w = math.fabs(p2.x - p1.x)
+    h = math.fabs(p2.y - p1.y)
+    return math.sqrt(w**2 + h**2)
 
 
 def printText(text, pos, color):
@@ -164,8 +184,10 @@ cfg = None
 cfg_file = None
 width = None
 height = None
+# shapes list
 ss = None
 text_buf = None
+center = None
 
 cmd = ['']
 cmd_edition_mode = False
@@ -210,41 +232,25 @@ def display():
     glClear(GL_COLOR_BUFFER_BIT)
     glPointSize(cfg['point_size'])
     glLineWidth(cfg['line_width'])
-
-    # cntr = Point(300, 300)
-    # r = 200.0
-    # glColor3ub(*Color('#ffffff').get3i())
-    # glBegin(GL_POLYGON)
-    # a = 0.0
-    # for a in np.arange(0, 2 * math.pi, math.pi / 36):
-        # glVertex2f(math.cos(a) * r + cntr.x, math.sin(a) * r + cntr.y)
-    # glEnd()
-
-    glColor3f(255,0,0)
-    glBegin(GL_POLYGON)
-    glVertex2i(100, 100)
-    glVertex2i(200, 100)
-    glVertex2i(200, 200)
-    glEnd()
+    glLoadIdentity()
 
     for s in ss:
+        glPushMatrix()
+        glTranslatef(*s.translation)
+        # glRotatef(*s.rotation)
+        glScalef(*s.scale)
         glColor3ub(*s.color.get3i())
         glBegin(GL_POLYGON)
         for i in range(0, len(s.vtx)):
             glVertex2i(*s.vtx[i].get2i())
         glEnd()
+        glPopMatrix()
 
-    if len(ss) != 0:
-        glColor3ub(*ss[-1].color.inverse().get3i())
-        glBegin(GL_LINE_LOOP)
-        for i in range(0, len(ss[-1].vtx)):
-            glVertex2i(*ss[-1].vtx[i].get2i())
+    if center != None:
+        glColor3ub(*cfg['shape_color'].get3i())
+        glBegin(GL_POINTS)
+        glVertex2i(*center.get2i())
         glEnd()
-
-        if len(ss[-1].vtx) != 0:
-            glBegin(GL_POINTS)
-            glVertex2i(*ss[-1].vtx[-1].get2i())
-            glEnd()
 
     printText(text_buf, Point(5, 20 + 15*text_buf.count('\n')), \
             cfg['text_color'])
@@ -324,14 +330,19 @@ def keyboard(key, x, y):
 
 def mouse(button, state, x, y):
     global cfg
-    global ss
+    global ss, center
 
     if state != GLUT_DOWN: return
     if button == GLUT_LEFT_BUTTON:
-        p = Point(x, height - y)
-        if len(ss) == 0: 
-            ss.append(Shape())
-        ss[-1].vtx.append(p)
+        if center == None:
+            center = Point(x, height - y)
+        else:
+            ss.append(Polygon(8, center, distance(center, Point(x, height - y))))
+            center = None
+        # p = Point(x, height - y)
+        # if len(ss) == 0: 
+            # ss.append(Shape())
+        # ss[-1].vtx.append(p)
     if button == GLUT_RIGHT_BUTTON:
         if len(ss) == 0: return
         if len(ss[-1].vtx) == 0:
@@ -369,6 +380,9 @@ if __name__ == '__main__':
 
     glutCreateWindow(cfg['title'])
     glEnable(GL_POINT_SMOOTH)
+    glEnable(GL_COLOR_LOGIC_OP)
+    # glLogicOp(GL_XOR)
+    glLogicOp(GL_EQUIV)
 
     glutReshapeFunc(reshape)
     glutDisplayFunc(display)

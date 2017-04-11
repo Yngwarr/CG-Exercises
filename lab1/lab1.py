@@ -3,8 +3,6 @@
 
 import sys
 import shlex
-import math
-import numpy as np
 from copy import deepcopy
 from peak.rules import *
 from OpenGL.GL import *
@@ -210,22 +208,6 @@ def display():
     glClear(GL_COLOR_BUFFER_BIT)
     glPointSize(cfg['point_size'])
     glLineWidth(cfg['line_width'])
-
-    # cntr = Point(300, 300)
-    # r = 200.0
-    # glColor3ub(*Color('#ffffff').get3i())
-    # glBegin(GL_POLYGON)
-    # a = 0.0
-    # for a in np.arange(0, 2 * math.pi, math.pi / 36):
-        # glVertex2f(math.cos(a) * r + cntr.x, math.sin(a) * r + cntr.y)
-    # glEnd()
-
-    glColor3f(255,0,0)
-    glBegin(GL_POLYGON)
-    glVertex2i(100, 100)
-    glVertex2i(200, 100)
-    glVertex2i(200, 200)
-    glEnd()
 
     for s in ss:
         glColor3ub(*s.color.get3i())
